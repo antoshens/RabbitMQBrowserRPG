@@ -38,7 +38,7 @@ namespace RabbitMQ.Infrastructure.RabbitMQBus
         {
             var factory = new ConnectionFactory
             {
-                // TODO: make it configurable through i.e. rabbitMQ.config.json file
+                // TODO: make it configurable through app.config file
                 HostName = "localhost"
             };
 

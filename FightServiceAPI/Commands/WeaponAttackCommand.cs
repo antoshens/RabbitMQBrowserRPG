@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
-
+﻿
 namespace FightServiceAPI.Commands
 {
     public class WeaponAttackCommand : AttackCommand

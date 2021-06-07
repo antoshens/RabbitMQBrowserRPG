@@ -153,6 +153,16 @@ namespace BrowserTextRPG.Services.FightService
             attackerChar.Fights++;
             opponentChar.Fights++;
 
+            // Publish event to RabbitMQ
+            var createSkillAttack = new SkillAttackCommand(
+                    skillAttack.AttackerId,
+                    skillAttack.OpponentId,
+                    damage
+                );
+
+            await this._bus.SendCommand(createSkillAttack);
+
+            // Update DB context
             this._dbContext.Characters.UpdateRange(attackerChar, opponentChar);
 
             await this._dbContext.SaveChangesAsync();
@@ -232,7 +242,7 @@ namespace BrowserTextRPG.Services.FightService
 
             await this._bus.SendCommand(createWeaponAttack);
 
-            // Update Character Db table
+            // Update Character DB table
             this._dbContext.Characters.UpdateRange(attackerChar, opponentChar);
 
             await this._dbContext.SaveChangesAsync();

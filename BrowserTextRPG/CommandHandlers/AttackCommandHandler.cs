@@ -7,7 +7,8 @@ using System.Threading.Tasks;
 
 namespace BrowserTextRPG.CommandHandlers
 {
-    public class AttackCommandHandler : IRequestHandler<WeaponAttackCommand, bool>
+    public class AttackCommandHandler : IRequestHandler<WeaponAttackCommand, bool>,
+        IRequestHandler<SkillAttackCommand, bool>
     {
         private readonly IEventBus _bus;
 
@@ -16,7 +17,15 @@ namespace BrowserTextRPG.CommandHandlers
             this._bus = bus;
         }
 
-        public Task<bool> Handle(WeaponAttackCommand request, CancellationToken cancellationToken)
+        Task<bool> IRequestHandler<WeaponAttackCommand, bool>.Handle(WeaponAttackCommand request, CancellationToken cancellationToken)
+        {
+            // Publish event to RabbitMQ
+            this._bus.Publish(new AttackCreatedEvent(request.AttackerId, request.OpponentId, request.Damage));
+
+            return Task.FromResult(true);
+        }
+
+        Task<bool> IRequestHandler<SkillAttackCommand, bool>.Handle(SkillAttackCommand request, CancellationToken cancellationToken)
         {
             // Publish event to RabbitMQ
             this._bus.Publish(new AttackCreatedEvent(request.AttackerId, request.OpponentId, request.Damage));
