@@ -14,6 +14,9 @@ using BrowserTextRPG.Services.FightService;
 using BrowserTextRPG.Middlewares;
 using RabbitMQ.Infrastructure.IoC;
 using MediatR;
+using BrowserTextRPG.Events;
+using BrowserTextRPG.EventHandlers;
+using RabbitMQ.Core.Bus;
 
 namespace BrowserTextRPG
 {
@@ -38,6 +41,9 @@ namespace BrowserTextRPG
             services.AddScoped<IFightService, FightService>();
 
             services.AddAutoMapper(typeof(Startup));
+
+            services.AddTransient<AttackFinishedEventHandler>();
+            services.AddTransient<IEventHandler<AttackFinishedEvent>, AttackFinishedEventHandler>();
 
             services.AddMediatR(typeof(Startup));
 
@@ -102,6 +108,14 @@ namespace BrowserTextRPG
             {
                 endpoints.MapControllers();
             });
+
+            this.ConfigureEnventBus(app);
+        }
+
+        private void ConfigureEnventBus(IApplicationBuilder app)
+        {
+            var eventBus = app.ApplicationServices.GetRequiredService<IEventBus>();
+            eventBus.Subscribe<AttackFinishedEvent, AttackFinishedEventHandler>();
         }
     }
 }

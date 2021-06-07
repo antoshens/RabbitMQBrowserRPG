@@ -10,6 +10,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using RabbitMQ.Core.Bus;
 using RabbitMQ.Infrastructure.IoC;
+using MediatR;
 
 namespace FightServiceAPI
 {
@@ -31,6 +32,8 @@ namespace FightServiceAPI
             services.AddTransient<IEventHandler<AttackCreatedEvent>, AttackCreatedHandler>();
 
             services.AddScoped<IAttackService, AttackService>();
+
+            services.AddMediatR(typeof(Startup));
 
             RegisterServices(services);
 
