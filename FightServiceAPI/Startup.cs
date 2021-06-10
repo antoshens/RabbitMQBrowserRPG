@@ -31,6 +31,9 @@ namespace FightServiceAPI
             services.AddTransient<AttackCreatedHandler>();
             services.AddTransient<IEventHandler<AttackCreatedEvent>, AttackCreatedHandler>();
 
+            services.AddTransient<AttackCreatedRPCHandler>();
+            services.AddTransient<IRPCEventHandler<AttackCreatedEvent>, AttackCreatedRPCHandler>();
+
             services.AddScoped<IAttackService, AttackService>();
 
             services.AddMediatR(typeof(Startup));
@@ -51,6 +54,8 @@ namespace FightServiceAPI
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
         public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
         {
+            ConfigureEnventBus(app);
+
             if (env.IsDevelopment())
             {
                 app.UseDeveloperExceptionPage();
@@ -67,13 +72,13 @@ namespace FightServiceAPI
                 endpoints.MapControllers();
             });
 
-            ConfigureEnventBus(app);
+            //ConfigureEnventBus(app);
         }
 
         private void ConfigureEnventBus(IApplicationBuilder app)
         {
             var eventBus = app.ApplicationServices.GetRequiredService<IEventBus>();
-            eventBus.Subscribe<AttackCreatedEvent, AttackCreatedHandler>();
+            eventBus.RPCSubscribe<AttackCreatedEvent, AttackCreatedRPCHandler, AttackFinishedEvent>();
         }
     }
 }

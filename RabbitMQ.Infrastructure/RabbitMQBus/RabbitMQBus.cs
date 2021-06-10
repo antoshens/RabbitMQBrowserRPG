@@ -140,5 +140,143 @@ namespace RabbitMQ.Infrastructure.RabbitMQBus
                 }
             }
         }
+
+        #region RPC
+
+        public Tres RPCCall<T, TReq, Tres>(T request)
+            where T : Command // request type
+            where TReq : Event // response type
+            where Tres : Event // reply type
+        {
+            var rpcClient = new RPCClient<TReq>();
+
+            var response = rpcClient.Call(request);
+
+            rpcClient.Close();
+
+            var responseType = typeof(Tres);
+            var concreteResponse = (Tres)JsonConvert.DeserializeObject(response, responseType);
+
+            return concreteResponse;
+        }
+
+
+        public void RPCSubscribe<T, TH, TR>()
+            where T : Event
+            where TH : IRPCEventHandler
+            where TR : Event // response event
+        {
+            {
+                // Generic part
+                var eventName = typeof(T).Name;
+                var handlerType = typeof(TH);
+
+                if (!this._eventTypes.Contains(typeof(T)))
+                {
+                    this._eventTypes.Add(typeof(T));
+                }
+
+                if (!this._handlers.ContainsKey(eventName))
+                {
+                    this._handlers.Add(eventName, new List<Type>());
+                }
+
+                if (this._handlers[eventName].Any(h => h.GetType() == handlerType))
+                {
+                    throw new ArgumentException($"Event handler {handlerType} is already exist for '{eventName}' event type.");
+                }
+
+                this._handlers[eventName].Add(handlerType);
+
+                // RabbitMQ Consumer part
+                StartRPCBasicConsume<T, TR>();
+            }
+        }
+
+        private void StartRPCBasicConsume<T, TR>()
+            where T : Event
+            where TR : Event
+        {
+            // TODO: Make it configurable
+            var factory = new ConnectionFactory
+            {
+                HostName = "localhost",
+                DispatchConsumersAsync = true,
+            };
+
+            var requestTypeName = typeof(T).Name;
+
+            var connection = factory.CreateConnection();
+            var channel = connection.CreateModel();
+
+            channel.QueueDeclare(queue: requestTypeName, durable: false, exclusive: false, autoDelete: false, arguments: null);
+            channel.BasicQos(0, 1, false); // prefetch-count = 1, in case if we would have several comsumers
+
+            var consumer = new AsyncEventingBasicConsumer(channel);
+            
+            consumer.Received += async (sender, e) =>
+            {
+                var props = e.BasicProperties;
+                var replyProps = channel.CreateBasicProperties();
+                replyProps.CorrelationId = props.CorrelationId;
+
+                var reply = await RPCConsumer_Received<TR>(sender, e);
+                var responseBytes = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(reply));
+
+                channel.BasicPublish(exchange: "", routingKey: props.ReplyTo,
+                     basicProperties: replyProps, body: responseBytes);
+            };
+
+            channel.BasicConsume(queue: requestTypeName, autoAck: true, consumer: consumer);
+        }
+
+        private async Task<T> RPCConsumer_Received<T>(object sender, BasicDeliverEventArgs e) where T : Event
+        {
+            var eventName = e.RoutingKey;
+            var message = Encoding.UTF8.GetString(e.Body.ToArray());
+
+            try
+            {
+                return await RPCProcessEvent<T>(eventName, message).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                return null;
+            }
+        }
+
+        private async Task<T> RPCProcessEvent<T>(string eventName, string message) where T : Event
+        {
+            if (this._handlers.ContainsKey(eventName))
+            {
+                var reply = new object() as T;
+
+                using (var scope = this._serviceScopeFactory.CreateScope())
+                {
+                    var subscriptions = this._handlers[eventName];
+
+                    foreach (var subscription in subscriptions)
+                    {
+                        var handler = scope.ServiceProvider.GetService(subscription);
+                        if (handler == null) continue;
+
+                        var eventType = this._eventTypes.FirstOrDefault(h => h.Name == eventName);
+                        var @event = JsonConvert.DeserializeObject(message, eventType);
+                        var concreteType = typeof(IRPCEventHandler<>).MakeGenericType(eventType);
+                        
+                        // To call the generic method
+                        var method = concreteType.GetMethod("Handle", new Type[] { @event.GetType() });
+                        method = method.MakeGenericMethod(typeof(T));
+
+                        reply = await (Task<T>)method.Invoke(handler, new object[] { @event });
+                    }
+                }
+
+                return reply;
+            }
+
+            return null;
+        }
+        #endregion
     }
 }

@@ -26,7 +26,7 @@ namespace FightServiceAPI.Services
            return await this._dbContext.AttackLogs.ToListAsync();
         }
 
-        public async Task AddAttackLog(AttackLog attackLog)
+        public async Task AddAttackLogResponse(AttackLog attackLog)
         {
             try
             {
@@ -48,6 +48,13 @@ namespace FightServiceAPI.Services
 
                 await this._bus.SendCommand<AttackResponseCommand>(attackFinishedResponse);
             }
+        }
+
+        public async Task AddAttackLog(AttackLog attackLog)
+        {
+            this._dbContext.AttackLogs.Add(attackLog);
+
+            await this._dbContext.SaveChangesAsync();
         }
     }
 }

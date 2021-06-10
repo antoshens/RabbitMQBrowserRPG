@@ -109,7 +109,7 @@ namespace BrowserTextRPG
                 endpoints.MapControllers();
             });
 
-            this.ConfigureEnventBus(app);
+            //this.ConfigureEnventBus(app);
         }
 
         private void ConfigureEnventBus(IApplicationBuilder app)

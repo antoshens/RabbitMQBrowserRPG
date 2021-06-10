@@ -17,7 +17,7 @@ namespace FightServiceAPI.EventHandlers
 
         public async Task Handle(AttackCreatedEvent @event)
         {
-            await this._attackService.AddAttackLog(new AttackLog
+            await this._attackService.AddAttackLogResponse(new AttackLog
             {
                 AttackerId = @event.AttackerId,
                 OpponentId = @event.OpponentId,

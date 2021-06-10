@@ -49,10 +49,12 @@
   <ItemGroup>
     <Compile Include="Bus\IEventBus.cs" />
     <Compile Include="Bus\IEventHandler.cs" />
+    <Compile Include="Bus\IRPCEventHandler.cs" />
     <Compile Include="Commands\Command.cs" />
     <Compile Include="Events\Event.cs" />
     <Compile Include="Events\Message.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="RPC\IRPCClient.cs" />
   </ItemGroup>
   <ItemGroup />
   <ItemGroup>

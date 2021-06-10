@@ -11,5 +11,13 @@ namespace RabbitMQ.Core.Bus
         void Subscribe<T, TH>()
             where T : Event
             where TH : IEventHandler<T>;
+        Tres RPCCall<T, TReq, Tres>(T request)
+            where T : Command
+            where TReq : Event
+            where Tres : Event;
+        void RPCSubscribe<T, TH, TR>()
+            where T : Event
+            where TH : IRPCEventHandler
+            where TR : Event;
     }
 }

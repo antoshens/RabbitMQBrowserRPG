@@ -2,6 +2,7 @@
 using BrowserTextRPG.Commands;
 using BrowserTextRPG.Data;
 using BrowserTextRPG.DTOModel.Fight;
+using BrowserTextRPG.Events;
 using BrowserTextRPG.Model;
 using BrowserTextRPG.Services.CharacterService;
 using Microsoft.EntityFrameworkCore;
@@ -23,6 +24,8 @@ namespace BrowserTextRPG.Services.FightService
         private readonly ILogger<FightService> _logger;
         private readonly JavaScriptSerializer _jsonSerializer = new JavaScriptSerializer();
         private readonly IEventBus _bus;
+
+        public Character AttackerCharacter { get; set; }
 
         public FightService(
             DataContext dbContext,
@@ -240,26 +243,42 @@ namespace BrowserTextRPG.Services.FightService
                     damage
                 );
 
-            await this._bus.SendCommand(createWeaponAttack);
+            //await this._bus.SendCommand(createWeaponAttack);
+            var rpcResponse = this._bus.RPCCall<WeaponAttackCommand, AttackCreatedEvent, AttackFinishedEvent>(createWeaponAttack);
 
-            // Update Character DB table
-            this._dbContext.Characters.UpdateRange(attackerChar, opponentChar);
-
-            await this._dbContext.SaveChangesAsync();
-
-            // Send a response
-            response.Data = new WeaponAttackResultDto
+            if (rpcResponse.Success)
             {
-                AttackerName = attackerChar.Name,
-                AttackerHP = attackerChar.Health,
-                OpponentName = opponentChar.Name,
-                OpponentHP = opponentChar.Health,
-                Damage = damage
-            };
+                // Update Character DB table
+                this._dbContext.Characters.UpdateRange(attackerChar, opponentChar);
 
-            this._logger.LogInformation($"Send reply from 'WeaponAttack': {{ {this._jsonSerializer.Serialize(response.Data)} }}");
+                await this._dbContext.SaveChangesAsync();
 
-            return response;
+                // Send a response
+                response.Data = new WeaponAttackResultDto
+                {
+                    AttackerName = attackerChar.Name,
+                    AttackerHP = attackerChar.Health,
+                    OpponentName = opponentChar.Name,
+                    OpponentHP = opponentChar.Health,
+                    Damage = damage
+                };
+
+                this._logger.LogInformation($"Send reply from 'WeaponAttack': {{ {this._jsonSerializer.Serialize(response.Data)} }}");
+
+                return response;
+            }
+            else
+            {
+                response.Fault = new Fault
+                {
+                    ErrorCode = 1,
+                    ErrorMessage = rpcResponse.Message
+                };
+
+                this._logger.LogInformation($"Send reply from 'WeaponAttack': {{ {this._jsonSerializer.Serialize(response.Fault)} }}");
+
+                return response;
+            }
         }
 
         public async Task<GatewayResponse<FightResponseDto>> AutoFight(FightRequestDto fightRequest)
