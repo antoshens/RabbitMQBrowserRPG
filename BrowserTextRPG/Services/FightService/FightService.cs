@@ -163,26 +163,41 @@ namespace BrowserTextRPG.Services.FightService
                     damage
                 );
 
-            await this._bus.SendCommand(createSkillAttack);
+            var rpcResponse = this._bus.RPCCall<SkillAttackCommand, AttackCreatedEvent, AttackFinishedEvent>(createSkillAttack);
 
-            // Update DB context
-            this._dbContext.Characters.UpdateRange(attackerChar, opponentChar);
-
-            await this._dbContext.SaveChangesAsync();
-
-            response.Data = new SkillAttackResultDto
+            if (rpcResponse.Success)
             {
-                AttackerName = attackerChar.Name,
-                AttackerHP = attackerChar.Health,
-                OpponentName = opponentChar.Name,
-                OpponentHP = opponentChar.Health,
-                Damage = damage,
-                SkillName = skill.Name
-            };
+                // Update DB context
+                this._dbContext.Characters.UpdateRange(attackerChar, opponentChar);
 
-            this._logger.LogInformation($"Send reply from 'SkillAttack': {{ {this._jsonSerializer.Serialize(response.Data)} }}");
+                await this._dbContext.SaveChangesAsync();
 
-            return response;
+                response.Data = new SkillAttackResultDto
+                {
+                    AttackerName = attackerChar.Name,
+                    AttackerHP = attackerChar.Health,
+                    OpponentName = opponentChar.Name,
+                    OpponentHP = opponentChar.Health,
+                    Damage = damage,
+                    SkillName = skill.Name
+                };
+
+                this._logger.LogInformation($"Send reply from 'SkillAttack': {{ {this._jsonSerializer.Serialize(response.Data)} }}");
+
+                return response;
+            }
+            else
+            {
+                response.Fault = new Fault
+                {
+                    ErrorCode = 1,
+                    ErrorMessage = rpcResponse.Message
+                };
+
+                this._logger.LogInformation($"Send reply from 'SkillAttack': {{ {this._jsonSerializer.Serialize(response.Fault)} }}");
+
+                return response;
+            }
         }
 
         public async Task<GatewayResponse<WeaponAttackResultDto>> WeaponAttack(WeaponAttackDto weaponAttack)

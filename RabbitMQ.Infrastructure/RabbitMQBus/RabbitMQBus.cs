@@ -249,7 +249,7 @@ namespace RabbitMQ.Infrastructure.RabbitMQBus
         {
             if (this._handlers.ContainsKey(eventName))
             {
-                var reply = new object() as T;
+                T reply = new object() as T;
 
                 using (var scope = this._serviceScopeFactory.CreateScope())
                 {
