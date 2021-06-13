@@ -5,6 +5,8 @@ using BrowserTextRPG.DTOModel.Fight;
 using BrowserTextRPG.Events;
 using BrowserTextRPG.Model;
 using BrowserTextRPG.Services.CharacterService;
+using BrowserTextRPG.Services.NotificationService;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Nancy.Json;
@@ -12,6 +14,8 @@ using RabbitMQ.Core.Bus;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net.WebSockets;
+using System.Security.Claims;
 using System.Threading.Tasks;
 
 namespace BrowserTextRPG.Services.FightService
@@ -24,6 +28,8 @@ namespace BrowserTextRPG.Services.FightService
         private readonly ILogger<FightService> _logger;
         private readonly JavaScriptSerializer _jsonSerializer = new JavaScriptSerializer();
         private readonly IEventBus _bus;
+        private readonly IHttpContextAccessor _httpContextAcessor;
+        private readonly INotificationService _notificationService;
 
         public Character AttackerCharacter { get; set; }
 
@@ -32,13 +38,17 @@ namespace BrowserTextRPG.Services.FightService
             ICharacterService characterService,
             IMapper mapper,
             ILogger<FightService> logger,
-            IEventBus bus)
+            IEventBus bus,
+            IHttpContextAccessor httpContextAcessor,
+            INotificationService notificationService)
         {
             this._dbContext = dbContext;
             this._characterService = characterService;
             this._mapper = mapper;
             this._logger = logger;
             this._bus = bus;
+            this._httpContextAcessor = httpContextAcessor;
+            this._notificationService = notificationService;
         }
 
         private bool ValidateOpponentCharacter(Character opponent, out int errorCode, out string errorMessage)
@@ -81,6 +91,8 @@ namespace BrowserTextRPG.Services.FightService
 
             return resultDamage > 0 ? resultDamage : 0;
         }
+
+        private int GetUserID() => int.Parse(this._httpContextAcessor.HttpContext.User.FindFirst(ClaimTypes.NameIdentifier).Value);
 
         public async Task<GatewayResponse<SkillAttackResultDto>> SkillAttack(SkillAttackDto skillAttack)
         {
@@ -184,6 +196,9 @@ namespace BrowserTextRPG.Services.FightService
 
                 this._logger.LogInformation($"Send reply from 'SkillAttack': {{ {this._jsonSerializer.Serialize(response.Data)} }}");
 
+                // Send WebSocket push notification
+                await this._notificationService.PushMessage($"Skill attack from '{attackerChar.Name}' to '{opponentChar.Name}' has been made with {damage} damage.", GetUserID());
+
                 return response;
             }
             else
@@ -238,7 +253,8 @@ namespace BrowserTextRPG.Services.FightService
             }
 
             // Calculate damage
-            var attackerChar = await _dbContext.Characters.FirstAsync(ch => ch.Id == attackerCharacterResponse.Data.Id);
+            var attackerChar = await _dbContext.Characters.FirstAsync(ch => attackerCharacterResponse.Data != null
+                && ch.Id == attackerCharacterResponse.Data.Id);
             var damage = DoWeaponAttack(attackerChar, opponentChar);
             opponentChar.Health -= damage;
 
@@ -279,6 +295,9 @@ namespace BrowserTextRPG.Services.FightService
                 };
 
                 this._logger.LogInformation($"Send reply from 'WeaponAttack': {{ {this._jsonSerializer.Serialize(response.Data)} }}");
+
+                // Send WebSocket push notification
+                await this._notificationService.PushMessage($"Weapon attack from '{attackerChar.Name}' to '{opponentChar.Name}' has been made with {damage} damage.", GetUserID());
 
                 return response;
             }
@@ -396,6 +415,14 @@ namespace BrowserTextRPG.Services.FightService
             this._logger.LogInformation($"Send reply from 'GetHighscore': {{ {this._jsonSerializer.Serialize(response.Data)} }}");
 
             return response;
+        }
+
+        public async Task<GatewayResponse<bool>> GetWebSocketConnection(HttpContext context)
+        {
+            var userID = this.GetUserID();
+            var user = this._httpContextAcessor.HttpContext.User.FindFirst(ClaimTypes.NameIdentifier);
+
+            return await this._notificationService.InitiateWebSocketConnection(context);
         }
     }
 }

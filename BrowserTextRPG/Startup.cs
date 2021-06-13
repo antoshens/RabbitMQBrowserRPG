@@ -17,6 +17,7 @@ using MediatR;
 using BrowserTextRPG.Events;
 using BrowserTextRPG.EventHandlers;
 using RabbitMQ.Core.Bus;
+using BrowserTextRPG.Services.NotificationService;
 
 namespace BrowserTextRPG
 {
@@ -44,6 +45,8 @@ namespace BrowserTextRPG
 
             services.AddTransient<AttackFinishedEventHandler>();
             services.AddTransient<IEventHandler<AttackFinishedEvent>, AttackFinishedEventHandler>();
+
+            services.AddSingleton<INotificationService, NotificationService>();
 
             services.AddMediatR(typeof(Startup));
 
@@ -103,6 +106,8 @@ namespace BrowserTextRPG
             app.UseAuthorization();
 
             app.UseMiddleware<ExceptionHabdlerMiddleware>();
+
+            app.UseWebSockets();
 
             app.UseEndpoints(endpoints =>
             {

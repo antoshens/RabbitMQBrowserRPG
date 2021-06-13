@@ -2,11 +2,9 @@
 using BrowserTextRPG.Model;
 using BrowserTextRPG.Services.FightService;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading.Tasks;
 
 namespace BrowserTextRPG.Controllers
@@ -55,6 +53,18 @@ namespace BrowserTextRPG.Controllers
             var response = await this._fightService.GetHighscore();
 
             return Ok(response);
+        }
+
+
+        [HttpGet]
+        public async Task WebSocketConnection()
+        {
+            var response = await _fightService.GetWebSocketConnection(this.HttpContext);
+
+            if (response.Fault != null)
+            {
+                this.HttpContext.Response.StatusCode = 400;
+            }
         }
     }
 }
